@@ -1,9 +1,9 @@
 #include <stdio.h>
-#include <stdint-gcc.h>
 #include <stdlib.h>
 #include <pcap/pcap.h>
 #include <string.h>
 #include "checksum.h"
+
 uint16_t readEthernetHeader(uint8_t *data){
     printf("\n\tEthernet Header\n\t\tDest MAC: ");
     printf("%x",data[0]);
@@ -62,13 +62,123 @@ void readArpHeader(uint8_t *data){
         printf(".%d",data[i]);
     }
 
+    printf("\n\n");
+
+
+}
+
+void readUDPHeader(uint8_t *data) {
+    uint8_t IPHL = 4*(data[14]%16);
+
+    printf("\n\tUDP Header\n\t\tSource Port: : ");
+
+    uint16_t srcPort;
+    memcpy(&srcPort, &data[IPHL + 14], 2);
+    srcPort = ntohs(srcPort);
+    printf("%u\n", srcPort);
+
+    uint16_t dstPort;
+    memcpy(&dstPort, &data[IPHL + 16], 2);
+    dstPort = ntohs(dstPort);
+    printf("\t\tDest Port: : %u\n", dstPort);
+
+}
+
+void readTCPHeader(uint8_t *data){
+
+    uint8_t IPHL = 4*(data[14]%16);
+
+    printf("\n\tTCP Header\n");
+
+
+    uint16_t srcPort;
+    memcpy(&srcPort, &data[IPHL + 14], 2);
+    srcPort = ntohs(srcPort);
+
+    if(srcPort == 80){
+        printf("\t\tSource Port:  HTTP\n");
+    } else {
+        printf("\t\tSource Port: : %u\n", srcPort);
+    }
+
+    uint16_t dstPort;
+    memcpy(&dstPort, &data[IPHL + 16], 2);
+    dstPort = ntohs(dstPort);
+    if(dstPort == 80){
+        printf("\t\tDest Port:  HTTP\n");
+    } else {
+        printf("\t\tDest Port: : %u\n", dstPort);
+    }
+
+    uint32_t sqNum;
+    memcpy(&sqNum, &data[IPHL + 18], 4);
+    sqNum = ntohl(sqNum);
+    printf("\t\tSequence Number: %u\n", sqNum);
+
+    uint32_t ackNum;
+    memcpy(&ackNum, &data[IPHL + 22], 4);
+    ackNum = ntohl(ackNum);
+
+    uint16_t flag;
+    memcpy(&flag, &data[IPHL + 26], 2);
+    flag = ntohs(flag);
+
+    if(flag & 0x0010){
+        printf("\t\tACK Number: %u\n", ackNum);
+    } else {
+        printf("\t\tACK Number: <not valid>\n");
+    }
+
+    printf("\t\tACK Flag: %s\n", (flag & 0x0010) ? "Yes":"No");
+    printf("\t\tSYN Flag: %s\n", (flag & 0x0002) ? "Yes":"No");
+    printf("\t\tRST Flag: %s\n", (flag & 0x0004) ? "Yes":"No");
+    printf("\t\tFIN Flag: %s\n", (flag & 0x0001) ? "Yes":"No");
+
+    uint16_t winSize;
+    memcpy(&winSize, &data[IPHL + 28], 2);
+    winSize = ntohs(winSize);
+    printf("\t\tWindow Size: %u\n", winSize);
+
+    uint16_t chkSm;
+    memcpy(&chkSm, &data[IPHL + 30], 2);
+    uint16_t PDUlength;
+    memcpy(&PDUlength, &data[16], 2);
+    PDUlength = ntohs(PDUlength);
+
+    uint16_t TCPLength = PDUlength-IPHL;
+    uint8_t *TCP = malloc((12+TCPLength));
+    memcpy(TCP, &data[26], 8);
+    TCP[8] = 0;
+    TCP[9] = 6;
+    uint16_t TCPLengthNetWork = htons(TCPLength);
+    memcpy(&TCP[10], &TCPLengthNetWork, 2);
+
+    memcpy(&TCP[12], &data[IPHL + 14], TCPLength);
+    printf("\t\tChecksum: %s (0x%x)",
+           (in_cksum((unsigned short *) (TCP), 12+TCPLength) == 0) ? "Correct":"Incorrect", ntohs(chkSm));
+    free(TCP);
+
+
     printf("\n");
 
 
 }
 
+void readICMPHeader(uint8_t *data) {
+    uint8_t IPHL = 4*(data[14]%16);
+    if(data[IPHL+14]==0){
+        printf("\n\tICMP Header\n\t\tType: Reply\n");
+    } else
+    if(data[IPHL+14]==8){
+        printf("\n\tICMP Header\n\t\tType: Request\n");
+    }  else
+        printf("\n\tICMP Header\n\t\tType: %u\n", data[IPHL+14]);
+
+}
+
 void readIPHeader(uint8_t *data){
     uint16_t PDUlength;
+    uint16_t chkSm;
     memcpy(&PDUlength, &data[16], 2);
     PDUlength = ntohs(PDUlength);
     printf("\n\tIP Header\n\t\tHeader Len: %d (bytes)", 4*(data[14]%16));
@@ -79,22 +189,19 @@ void readIPHeader(uint8_t *data){
     printf("\n\t\tIP PDU Len: %d (bytes)", PDUlength);
     printf("\n\t\tProtocol: ");
     uint8_t protocol = data[23];
-    if(protocol == 1){
+    if(protocol == 1)
         printf("ICMP");
-    } else
-    if(protocol == 6){
+    else if(protocol == 6)
         printf("TCP");
-    } else
-    if(protocol == 16){
+    else if(protocol == 17)
         printf("UDP");
-    }else
+    else
         printf("Unknown");
 
-    uint16_t chkSm;
     memcpy(&chkSm, &data[24], 2);
-    //chkSm = ntohs(chkSm);
 
-    printf("\n\t\tChecksum: %s (0x%x)", (in_cksum((unsigned short *) (data + 14), 4*(data[14]%16)) == 0) ? "Correct":"Incorrect", chkSm);
+    printf("\n\t\tChecksum: %s (0x%x)",
+           (in_cksum((unsigned short *) (data + 14), 4*(data[14]%16)) == 0) ? "Correct":"Incorrect", chkSm);
 
     printf("\n\t\tSender IP: ");
     printf("%d",data[26]);
@@ -107,45 +214,50 @@ void readIPHeader(uint8_t *data){
         printf(".%d",data[i]);
     }
     printf("\n");
+
+    if(protocol == 6){
+        readTCPHeader(data);
+    }
+    if(protocol == 17){
+        readUDPHeader(data);
+    }
+    if(protocol == 1){
+        readICMPHeader(data);
+    }
 }
 
 
-int main(){
 
 
+int main(int argc, char *argv[]){
 
-//    char pcapError[PCAP_ERRBUF_SIZE];
-//    pcap_t *capture = pcap_open_offline("PingTest.pcap", pcapError);
-//    pcap_loop(capture, 0, )
+    FILE* ptr;
 
+    if(argc != 2){
+        printf("Invalid Arguments\n");
+    }
 
-
-
-
-FILE* ptr;
-char ch;
-
-    ptr = fopen("PingTest.pcap", "rb");
+    ptr = fopen(argv[1], "rb");
 
     if(NULL == ptr){
         printf("File Does Not Exist. Exiting..\n");
         return 0;
     }
 
-    fseek(ptr, 0, SEEK_END); // seek to end of file
-    int size = ftell(ptr) - 24; // get current file pointer
-    fseek(ptr, 0, SEEK_SET); // seek back to beginning of file
-
-    printf("\n");
+    fseek(ptr, 0, SEEK_END);
+    long size = ftell(ptr) - 24;
+    fseek(ptr, 0, SEEK_SET);
 
     int packetIndex = 1;
     uint8_t FileHeader[24];
     fread(FileHeader, 24, 1, ptr);
 
     while(size > 16){
+        printf("\n");
         uint8_t PacketRecord[16];
         fread(PacketRecord, 16, 1, ptr);
-        uint8_t dataLen = PacketRecord[8];
+        uint32_t dataLen;
+        memcpy(&dataLen, &PacketRecord[8], 4);
         uint8_t *data = malloc(dataLen);
         printf("Packet number: %d  Frame Len: %d\n", packetIndex, dataLen);
         fread(data, dataLen, 1, ptr);
@@ -154,8 +266,7 @@ char ch;
             readArpHeader(data);
         if(type == 0x0800)
             readIPHeader(data);
-        printf("\n");
-        size -= (16+dataLen);
+        size -= (long)(16+dataLen);
         packetIndex++;
         free(data);
     }
