@@ -3,16 +3,18 @@
 #include <pcap/pcap.h>
 #include <string.h>
 #include "checksum.h"
+#include <arpa/inet.h>
 
 uint16_t readEthernetHeader(uint8_t *data){
     printf("\n\tEthernet Header\n\t\tDest MAC: ");
     printf("%x",data[0]);
-    for(int i =1; i<6;i++){
+    int i = 0;
+    for( i=1; i<6;i++){
         printf(":%x",data[i]);
     }
     printf("\n\t\tSource MAC: ");
     printf("%x",data[6]);
-    for(int i =7; i<12;i++){
+    for(i =7; i<12;i++){
         printf(":%x",data[i]);
     }
     printf("\n\t\t");
@@ -40,25 +42,26 @@ void readArpHeader(uint8_t *data){
 
     printf("\t\tSender MAC: ");
     printf("%x",data[22]);
-    for(int i =23; i<28;i++){
+    int i =0;
+    for(i =23; i<28;i++){
         printf(":%x",data[i]);
     }
 
     printf("\n\t\tSender IP: ");
     printf("%d",data[28]);
-    for(int i =29; i<32;i++){
+    for(i =29; i<32;i++){
         printf(".%d",data[i]);
     }
 
     printf("\n\t\tTarget MAC: ");
     printf("%x",data[32]);
-    for(int i =33; i<38;i++){
+    for(i =33; i<38;i++){
         printf(":%x",data[i]);
     }
 
     printf("\n\t\tTarget IP: ");
     printf("%d",data[38]);
-    for(int i =39; i<42;i++){
+    for(i =39; i<42;i++){
         printf(".%d",data[i]);
     }
 
@@ -205,12 +208,13 @@ void readIPHeader(uint8_t *data){
 
     printf("\n\t\tSender IP: ");
     printf("%d",data[26]);
-    for(int i =27; i<30;i++){
+    int i =0;
+    for(i =27; i<30;i++){
         printf(".%d",data[i]);
     }
     printf("\n\t\tDest IP: ");
     printf("%d",data[30]);
-    for(int i =31; i<34;i++){
+    for(i =31; i<34;i++){
         printf(".%d",data[i]);
     }
     printf("\n");
@@ -270,6 +274,6 @@ int main(int argc, char *argv[]){
         packetIndex++;
         free(data);
     }
-
+return 0;
 
 }
