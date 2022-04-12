@@ -1,0 +1,8 @@
+464 Program 1
+
+Author: Tyler Bovenzi
+Lecture Section 1 (9:40a)
+Lab Section 2 (12:00p)
+
+Note: To compile, simply type make
+To run use ./trace <FileName>.pcap
